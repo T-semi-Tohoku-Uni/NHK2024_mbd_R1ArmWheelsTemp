@@ -177,7 +177,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
             }
 
             //Arm
-            if (FDCAN1_RxHeader.Identifier == 0x101) {
+            if (FDCAN1_RxHeader.Identifier == CANID_ARM1) {
             	//回収
             	if (FDCAN1_RxData[0] == 0x01){
                     for (int k = 0; k < 4; k++){
@@ -215,7 +215,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
             }
 
             //足回り
-            if (FDCAN1_RxHeader.Identifier == 0x102) {
+            if (FDCAN1_RxHeader.Identifier == CANID_ROBOT_VEL) {
                 if (FDCAN1_RxData[0] == 0x01){
                     for (int k = 0; k < 4; k++){
                         FDCAN3_TxData[k * 2] = move[0][k] >> 8;
@@ -310,10 +310,10 @@ int main(void)
 
     FDCAN1_sFilterConfig.IdType = FDCAN_STANDARD_ID;
     FDCAN1_sFilterConfig.FilterIndex = 0;
-    FDCAN1_sFilterConfig.FilterType = FDCAN_FILTER_RANGE;
+    FDCAN1_sFilterConfig.FilterType = FDCAN_FILTER_MASK;
     FDCAN1_sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
-    FDCAN1_sFilterConfig.FilterID1 = 0x100;
-    FDCAN1_sFilterConfig.FilterID2 = 0x102;
+    FDCAN1_sFilterConfig.FilterID1 = CANID_ARM1;
+    FDCAN1_sFilterConfig.FilterID2 = 0b11111111100;
 
     if (HAL_FDCAN_ConfigFilter(&hfdcan1, &FDCAN1_sFilterConfig) != HAL_OK) {
         Error_Handler();
