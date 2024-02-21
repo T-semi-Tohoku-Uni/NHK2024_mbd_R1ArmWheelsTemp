@@ -24,6 +24,8 @@
 
 #include "stdio.h"
 #include "string.h"
+
+#include "R1CANIDList.h"
 #include <math.h>
 
 /* USER CODE END Includes */
@@ -299,10 +301,10 @@ int main(void)
     FDCAN1_TxHeader.Identifier = 0x000;
     FDCAN1_TxHeader.IdType = FDCAN_STANDARD_ID;
     FDCAN1_TxHeader.TxFrameType = FDCAN_DATA_FRAME;
-    FDCAN1_TxHeader.DataLength = FDCAN_DLC_BYTES_16;
+    FDCAN1_TxHeader.DataLength = FDCAN_DLC_BYTES_1;
     FDCAN1_TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
-    FDCAN1_TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
-    FDCAN1_TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
+    FDCAN1_TxHeader.BitRateSwitch = FDCAN_BRS_ON;
+    FDCAN1_TxHeader.FDFormat = FDCAN_FD_CAN;
     FDCAN1_TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
     FDCAN1_TxHeader.MessageMarker = 0;
 
