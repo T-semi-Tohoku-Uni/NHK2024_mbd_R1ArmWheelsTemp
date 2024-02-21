@@ -65,8 +65,8 @@ FDCAN_TxHeaderTypeDef FDCAN3_TxHeader;
 FDCAN_RxHeaderTypeDef FDCAN3_RxHeader;
 FDCAN_FilterTypeDef FDCAN3_sFilterConfig;
 
-uint16_t FDCAN1_TxData[4] = {0};
-uint16_t FDCAN1_RxData[4] = {0};
+uint8_t FDCAN1_TxData[4] = {0};
+uint8_t FDCAN1_RxData[4] = {0};
 uint32_t FDCAN1_TxMailbox;
 
 uint8_t FDCAN3_TxData[8] = {0};
@@ -141,6 +141,7 @@ void InverseKinematics(robotPosStatus *robotPos, motor wheelMotor[]){
 	//座標変換行�??
 
 	float wheelParam = (WHEELBASE_LEN + TREAD_LEN) / 2;
+	uint8_t gain = 6;
 	const float A[4][3] = {
 			{ 200, -200, wheelParam},
 			{ 200,  200, wheelParam},
@@ -152,7 +153,7 @@ void InverseKinematics(robotPosStatus *robotPos, motor wheelMotor[]){
 		wheelMotor[i].trgVel = 0;
 
 		for(uint8_t j=0; j<3; j++){
-			wheelMotor[i].trgVel += A[i][j] * robotPos->trgVel[j] / WHEEL_DIAMETER;
+			wheelMotor[i].trgVel += gain * A[i][j] * robotPos->trgVel[j] / WHEEL_DIAMETER;
 		}
 		//printf("%d:%f\r\n", i, wheelMotor[i].trgVel);
 	}
@@ -221,6 +222,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 
             //Arm
             if (FDCAN1_RxHeader.Identifier == CANID_ARM1) {
+            	printf("Arm:%d\r\n", FDCAN1_RxData[0]);
             	//回収
             	if (FDCAN1_RxData[0] == 0x01){
                     for (int k = 0; k < 4; k++){
@@ -260,19 +262,26 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
             //足回り
             if (FDCAN1_RxHeader.Identifier == CANID_ROBOT_VEL) {
             	for(uint8_t i=0; i<3; i++){
-            		gRobotPos.trgVel[i] = FDCAN1_RxData[i] - 127;
+            		gRobotPos.trgVel[i] = (float)(FDCAN1_RxData[i] - 127);
             	}
 
+            	printf("x:%f, y:%f, r:%f\r\n", gRobotPos.trgVel[0], gRobotPos.trgVel[1], gRobotPos.trgVel[2]);
             	InverseKinematics(&gRobotPos, gMotor);
+
             	for(uint8_t i=0; i<4; i++){
-            		FDCAN3_TxData[i] = gMotor[i].trgVel;
+            		int16_t vel = gMotor[i].trgVel;
+            		FDCAN3_TxData[i*2] = vel>>8;
+            		FDCAN3_TxData[i*2+1] = vel & 0x00FF;
+            		printf("%d:%d", i, vel);
             	}
+            	printf("\r\n");
+            	FDCAN3_TxHeader.Identifier = 0x1FF;
 
 				if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan3, &FDCAN3_TxHeader, FDCAN3_TxData) != HAL_OK) {
 					Error_Handler();
 				}
-
-                printf("%d %d %d %d\n\r", FDCAN3_TxData[1], FDCAN3_TxData[3], FDCAN3_TxData[5], FDCAN3_TxData[7]);
+				//printf("robot vel %d\r\n")
+                //printf("%d %d %d %d\n\r", FDCAN3_TxData[1], FDCAN3_TxData[3], FDCAN3_TxData[5], FDCAN3_TxData[7]);
             }
         }
     }
@@ -313,6 +322,7 @@ int main(void)
   MX_LPUART1_UART_Init();
   MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
+  printf("Initialized\r\n");
 
     FDCAN1_TxHeader.Identifier = 0x000;
     FDCAN1_TxHeader.IdType = FDCAN_STANDARD_ID;
