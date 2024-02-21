@@ -42,7 +42,9 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define WHEEL_DIAMETER 100 //[mm]
+#define WHEELBASE_LEN 300 //[mm]
+#define TREAD_LEN 200//[mm]
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -90,6 +92,27 @@ struct pid_data{
     int goal[4];
 };
 
+typedef struct{
+	float actPos[3];
+	float trgPos[3];
+	float outPos[3];
+	float actVel[3];
+	float trgVel[3];
+	float outVel[3];
+} robotPosStatus;
+
+typedef struct{
+	uint16_t CANID;
+	uint8_t motorID;
+	float trgVel;
+	float actVel;
+	float outVel;
+	float angle;//[rad]
+}motor;
+
+robotPosStatus gRobotPos;
+motor gMotor[4];
+
 struct pid_data pid = {1 / pow(10, 3), {0,0,0,0}};
 int flag = 3;
 
@@ -114,6 +137,26 @@ static void MX_TIM7_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void InverseKinematics(robotPosStatus *robotPos, motor wheelMotor[]){
+	//座標変換行�??
+
+	float wheelParam = (WHEELBASE_LEN + TREAD_LEN) / 2;
+	const float A[4][3] = {
+			{ 200, -200, wheelParam},
+			{ 200,  200, wheelParam},
+			{-200,  200, wheelParam},
+			{-200, -200, wheelParam}
+	};
+
+	for(uint8_t i=0; i<4; i++){
+		wheelMotor[i].trgVel = 0;
+
+		for(uint8_t j=0; j<3; j++){
+			wheelMotor[i].trgVel += A[i][j] * robotPos->trgVel[j] / WHEEL_DIAMETER;
+		}
+		//printf("%d:%f\r\n", i, wheelMotor[i].trgVel);
+	}
+}
 
 int _write(int file, char *ptr, int len)
 {
@@ -216,46 +259,19 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 
             //足回り
             if (FDCAN1_RxHeader.Identifier == CANID_ROBOT_VEL) {
-                if (FDCAN1_RxData[0] == 0x01){
-                    for (int k = 0; k < 4; k++){
-                        FDCAN3_TxData[k * 2] = move[0][k] >> 8;
-                        FDCAN3_TxData[k * 2 + 1] = move[0][k];
-                    }
-                    FDCAN3_TxHeader.Identifier = 0x1FF;
-                    if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan3, &FDCAN3_TxHeader, FDCAN3_TxData) != HAL_OK) {
-                        Error_Handler();
-                    }
-                }
-                if (FDCAN1_RxData[0] == 0x02){
-                    for (int k = 0; k < 4; k++){
-                        FDCAN3_TxData[k * 2] = move[1][k] >> 8;
-                        FDCAN3_TxData[k * 2 + 1] = move[1][k];
-                    }
-                    FDCAN3_TxHeader.Identifier = 0x1FF;
-                    if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan3, &FDCAN3_TxHeader, FDCAN3_TxData) != HAL_OK) {
-                        Error_Handler();
-                    }
-                }
-                if (FDCAN1_RxData[0] == 0x03) {
-                    for (int k = 0; k < 4; k++){
-                        FDCAN3_TxData[k * 2] = move[2][k] >> 8;
-                        FDCAN3_TxData[k * 2 + 1] = move[2][k];
-                    }
-                    FDCAN3_TxHeader.Identifier = 0x1FF;
-                    if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan3, &FDCAN3_TxHeader, FDCAN3_TxData) != HAL_OK) {
-                        Error_Handler();
-                    }
-                }
-                if (FDCAN1_RxData[0] == 0x04) {
-                    for (int k = 0; k < 4; k++){
-                        FDCAN3_TxData[k * 2] = move[3][k] >> 8;
-                        FDCAN3_TxData[k * 2 + 1] = move[3][k];
-                    }
-                    FDCAN3_TxHeader.Identifier = 0x1FF;
-                    if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan3, &FDCAN3_TxHeader, FDCAN3_TxData) != HAL_OK) {
-                        Error_Handler();
-                    }
-                }
+            	for(uint8_t i=0; i<3; i++){
+            		gRobotPos.trgVel[i] = FDCAN1_RxData[i] - 127;
+            	}
+
+            	InverseKinematics(&gRobotPos, gMotor);
+            	for(uint8_t i=0; i<4; i++){
+            		FDCAN3_TxData[i] = gMotor[i].trgVel;
+            	}
+
+				if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan3, &FDCAN3_TxHeader, FDCAN3_TxData) != HAL_OK) {
+					Error_Handler();
+				}
+
                 printf("%d %d %d %d\n\r", FDCAN3_TxData[1], FDCAN3_TxData[3], FDCAN3_TxData[5], FDCAN3_TxData[7]);
             }
         }
