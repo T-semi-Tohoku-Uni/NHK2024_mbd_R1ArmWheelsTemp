@@ -215,8 +215,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 
 
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs) {
-
-
+	printf("read message!!!\r\n");
     if (hfdcan == &hfdcan1){
         if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET) {
             if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &FDCAN1_RxHeader, FDCAN1_RxData) != HAL_OK) {
@@ -295,6 +294,28 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
             }
         }
     }
+
+
+    if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET) {
+    		if (hfdcan == &hfdcan3) {
+    			if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &FDCAN3_RxHeader, FDCAN3_RxData) != HAL_OK) {
+    				printf("error code:%ld\r\n", hfdcan->ErrorCode);
+    				Error_Handler();
+    			}
+    		}
+    	}
+}
+
+void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs) {
+	printf("FIFO1 callback\r\n");
+	if ((RxFifo1ITs & FDCAN_IT_RX_FIFO1_NEW_MESSAGE) != RESET) {
+		if (hfdcan == &hfdcan3) {
+			if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO1, &FDCAN3_RxHeader, FDCAN3_RxData) != HAL_OK) {
+        printf("error code:%d\r\n", hfdcan->ErrorCode);
+				Error_Handler();
+			}
+		}
+	}
 }
 
 /* USER CODE END 0 */
@@ -385,12 +406,12 @@ int main(void)
 
     FDCAN3_sFilterConfig.IdType = FDCAN_STANDARD_ID;
     FDCAN3_sFilterConfig.FilterIndex = 0;
-    FDCAN3_sFilterConfig.FilterType = FDCAN_FILTER_DUAL;
+    FDCAN3_sFilterConfig.FilterType = FDCAN_FILTER_RANGE;
     FDCAN3_sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
-    FDCAN3_sFilterConfig.FilterID1 = 0x101;
-    FDCAN3_sFilterConfig.FilterID2 = 0x300;
+    FDCAN3_sFilterConfig.FilterID1 = 0x000;
+    FDCAN3_sFilterConfig.FilterID2 = 0x7ff;
 
-    if (HAL_FDCAN_ConfigFilter(&hfdcan3, &FDCAN1_sFilterConfig) != HAL_OK) {
+    if (HAL_FDCAN_ConfigFilter(&hfdcan3, &FDCAN3_sFilterConfig) != HAL_OK) {
         Error_Handler();
     }
     if (HAL_FDCAN_ConfigGlobalFilter(&hfdcan3, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) !=
@@ -404,22 +425,60 @@ int main(void)
         Error_Handler();
     }
 
+//    FDCAN3_sFilterConfig.IdType = FDCAN_STANDARD_ID;
+//    FDCAN3_sFilterConfig.FilterIndex = 1;
+//    FDCAN3_sFilterConfig.FilterType = FDCAN_FILTER_MASK;
+//    FDCAN3_sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+//    FDCAN3_sFilterConfig.FilterID1 = 0x000;
+//    FDCAN3_sFilterConfig.FilterID2 = 0x000;
+//
+//      if (HAL_FDCAN_ConfigFilter(&hfdcan3, &FDCAN3_sFilterConfig) != HAL_OK){
+//    	  Error_Handler();
+//      }
+//      if (HAL_FDCAN_ConfigGlobalFilter(&hfdcan3, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) != HAL_OK) {
+//          Error_Handler();
+//      }
+//
+//      // start CAN
+//      if (HAL_FDCAN_Start(&hfdcan3) != HAL_OK){ Error_Handler();}
+//
+//      // CAN reception settings
+//      if (HAL_FDCAN_ActivateNotification(&hfdcan3, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
+//      {
+//         Error_Handler();
+//      }
+
 //    HAL_TIM_Base_Start_IT(&htim7);
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
+//  HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
 
-  uint16_t adc1_result[8] = {0};
+//  uint16_t adc1_result[8] = {0};
 
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)&adc1_result, 4);
+//  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)&adc1_result, 4);
 
   while (1)
   {
-    printf("%d %d %d %d\r\n", adc1_result[0], adc1_result[1], adc1_result[2], adc1_result[3]);
-    HAL_Delay(100);
+//	  printf("Hello\r\n");
+	  HAL_Delay(100);
+//	uint8_t FDCAN3_TxData[8] = {1};
+//	FDCAN3_TxHeader.Identifier = 0x1FF;
+//
+//	FDCAN3_TxData[2] = 10;
+//	FDCAN3_TxData[3] = 10;
+//
+//	if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan3, &FDCAN3_TxHeader, FDCAN3_TxData) != HAL_OK) {
+//		Error_Handler();
+//	}
+//
+//	printf("send_message\r\n");
+//	HAL_Delay(100);
+
+//    printf("%d %d %d %d\r\n", adc1_result[0], adc1_result[1], adc1_result[2], adc1_result[3]);
+//    HAL_Delay(100);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -650,7 +709,6 @@ static void MX_FDCAN3_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN FDCAN3_Init 2 */
-
   /* USER CODE END FDCAN3_Init 2 */
 
 }
@@ -809,6 +867,7 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+//	  printf("error\r\n");
   }
   /* USER CODE END Error_Handler_Debug */
 }
