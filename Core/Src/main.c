@@ -215,7 +215,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 
 
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs) {
-	printf("read message!!!\r\n");
+//	printf("read message!!!\r\n");
     if (hfdcan == &hfdcan1){
         if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET) {
             if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &FDCAN1_RxHeader, FDCAN1_RxData) != HAL_OK) {
@@ -297,7 +297,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 }
 
 void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs) {
-	printf("FIFO1 callback\r\n");
+//	printf("FIFO1 callback\r\n");
 	if ((RxFifo1ITs & FDCAN_IT_RX_FIFO1_NEW_MESSAGE) != RESET) {
 		if (hfdcan == &hfdcan3) {
 			if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO1, &FDCAN3_RxHeader, FDCAN3_RxData) != HAL_OK) {
@@ -359,31 +359,16 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-//  HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
+  HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
 
-//  uint16_t adc1_result[8] = {0};
+  uint16_t adc1_result[8] = {0};
 
-//  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)&adc1_result, 4);
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)&adc1_result, 4);
 
   while (1)
   {
-//	  printf("Hello\r\n");
-	  HAL_Delay(100);
-//	uint8_t FDCAN3_TxData[8] = {1};
-//	FDCAN3_TxHeader.Identifier = 0x1FF;
-//
-//	FDCAN3_TxData[2] = 10;
-//	FDCAN3_TxData[3] = 10;
-//
-//	if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan3, &FDCAN3_TxHeader, FDCAN3_TxData) != HAL_OK) {
-//		Error_Handler();
-//	}
-//
-//	printf("send_message\r\n");
-//	HAL_Delay(100);
-
-//    printf("%d %d %d %d\r\n", adc1_result[0], adc1_result[1], adc1_result[2], adc1_result[3]);
-//    HAL_Delay(100);
+    printf("%d %d %d %d\r\n", adc1_result[0], adc1_result[1], adc1_result[2], adc1_result[3]);
+    HAL_Delay(100);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
