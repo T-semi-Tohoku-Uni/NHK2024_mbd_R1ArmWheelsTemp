@@ -263,22 +263,22 @@ void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef* hfdcan)
       __HAL_RCC_FDCAN_CLK_ENABLE();
     }
 
-    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
     /**FDCAN3 GPIO Configuration
-    PB3     ------> FDCAN3_RX
-    PB4     ------> FDCAN3_TX
+    PA8     ------> FDCAN3_RX
+    PA15     ------> FDCAN3_TX
     */
-    GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_4;
+    GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_15;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Alternate = GPIO_AF11_FDCAN3;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     /* FDCAN3 interrupt Init */
-    HAL_NVIC_SetPriority(FDCAN3_IT0_IRQn, 2, 0);
+    HAL_NVIC_SetPriority(FDCAN3_IT0_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(FDCAN3_IT0_IRQn);
-    HAL_NVIC_SetPriority(FDCAN3_IT1_IRQn, 2, 0);
+    HAL_NVIC_SetPriority(FDCAN3_IT1_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(FDCAN3_IT1_IRQn);
   /* USER CODE BEGIN FDCAN3_MspInit 1 */
 
@@ -331,10 +331,10 @@ void HAL_FDCAN_MspDeInit(FDCAN_HandleTypeDef* hfdcan)
     }
 
     /**FDCAN3 GPIO Configuration
-    PB3     ------> FDCAN3_RX
-    PB4     ------> FDCAN3_TX
+    PA8     ------> FDCAN3_RX
+    PA15     ------> FDCAN3_TX
     */
-    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_3|GPIO_PIN_4);
+    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_8|GPIO_PIN_15);
 
     /* FDCAN3 interrupt DeInit */
     HAL_NVIC_DisableIRQ(FDCAN3_IT0_IRQn);
