@@ -26,6 +26,7 @@
 #include "string.h"
 
 #include "R1CANIDList.h"
+#include "DJI_CANIDList.h"
 #include <math.h>
 
 /* USER CODE END Includes */
@@ -48,11 +49,15 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
+
 FDCAN_HandleTypeDef hfdcan1;
 FDCAN_HandleTypeDef hfdcan3;
 
 UART_HandleTypeDef hlpuart1;
 
+TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim7;
 
 /* USER CODE BEGIN PV */
@@ -127,10 +132,13 @@ uint16_t adc[4] = {0};
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_FDCAN1_Init(void);
-static void MX_FDCAN3_Init(void);
+static void MX_DMA_Init(void);
 static void MX_LPUART1_UART_Init(void);
+static void MX_FDCAN3_Init(void);
+static void MX_FDCAN1_Init(void);
 static void MX_TIM7_Init(void);
+static void MX_ADC1_Init(void);
+static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -210,8 +218,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 
 
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs) {
-
-
+	printf("read message!!!\r\n");
     if (hfdcan == &hfdcan1){
         if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET) {
             if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &FDCAN1_RxHeader, FDCAN1_RxData) != HAL_OK) {
@@ -257,7 +264,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 
                 static uint8_t times = 0;
                 times++;
-                times%50;
+//                times%50;
                 if(times==0)printf("%d\n\r", adc[0]);
             }
 
@@ -292,6 +299,21 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     }
 }
 
+void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs) {
+//	printf("FIFO1 callback\r\n");
+	if ((RxFifo1ITs & FDCAN_IT_RX_FIFO1_NEW_MESSAGE) != RESET) {
+		if (hfdcan == &hfdcan3) {
+			if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO1, &FDCAN3_RxHeader, FDCAN3_RxData) != HAL_OK) {
+					printf("error code:%ld\r\n", hfdcan->ErrorCode);
+				Error_Handler();
+			}
+//			printf("can_id is %d\r\n", FDCAN3_RxHeader.Identifier);
+//			uint8_t motorID = FDCAN3_RxHeader.Identifier - DJI_CANID_TX0 - 1;
+			// TODO : Update motor state
+		}
+	}
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -322,10 +344,13 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_FDCAN1_Init();
-  MX_FDCAN3_Init();
+  MX_DMA_Init();
   MX_LPUART1_UART_Init();
+  MX_FDCAN3_Init();
+  MX_FDCAN1_Init();
   MX_TIM7_Init();
+  MX_ADC1_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
   pid.t = 1 / pow(10, 3);
   for (int k = 0; k < 4; k++){
@@ -335,76 +360,27 @@ int main(void)
   }
   printf("Initialized\r\n");
 
-    FDCAN1_TxHeader.Identifier = 0x000;
-    FDCAN1_TxHeader.IdType = FDCAN_STANDARD_ID;
-    FDCAN1_TxHeader.TxFrameType = FDCAN_DATA_FRAME;
-    FDCAN1_TxHeader.DataLength = FDCAN_DLC_BYTES_1;
-    FDCAN1_TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
-    FDCAN1_TxHeader.BitRateSwitch = FDCAN_BRS_ON;
-    FDCAN1_TxHeader.FDFormat = FDCAN_FD_CAN;
-    FDCAN1_TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
-    FDCAN1_TxHeader.MessageMarker = 0;
-
-    FDCAN1_sFilterConfig.IdType = FDCAN_STANDARD_ID;
-    FDCAN1_sFilterConfig.FilterIndex = 0;
-    FDCAN1_sFilterConfig.FilterType = FDCAN_FILTER_MASK;
-    FDCAN1_sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
-    FDCAN1_sFilterConfig.FilterID1 = CANID_ARM1;
-    FDCAN1_sFilterConfig.FilterID2 = 0b11111111100;
-
-    if (HAL_FDCAN_ConfigFilter(&hfdcan1, &FDCAN1_sFilterConfig) != HAL_OK) {
-        Error_Handler();
-    }
-    if (HAL_FDCAN_ConfigGlobalFilter(&hfdcan1, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) !=
-        HAL_OK) {
-        Error_Handler();
-    }
-    if (HAL_FDCAN_Start(&hfdcan1) != HAL_OK) {
-        Error_Handler();
-    }
-    if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK){
-        Error_Handler();
-    }
-
-    FDCAN3_TxHeader.Identifier = 0x000;
-    FDCAN3_TxHeader.IdType = FDCAN_STANDARD_ID;
-    FDCAN3_TxHeader.TxFrameType = FDCAN_DATA_FRAME;
-    FDCAN3_TxHeader.DataLength = FDCAN_DLC_BYTES_8;
-    FDCAN3_TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
-    FDCAN3_TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
-    FDCAN3_TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
-    FDCAN3_TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
-    FDCAN3_TxHeader.MessageMarker = 0;
-
-    FDCAN3_sFilterConfig.IdType = FDCAN_STANDARD_ID;
-    FDCAN3_sFilterConfig.FilterIndex = 0;
-    FDCAN3_sFilterConfig.FilterType = FDCAN_FILTER_DUAL;
-    FDCAN3_sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
-    FDCAN3_sFilterConfig.FilterID1 = 0x101;
-    FDCAN3_sFilterConfig.FilterID2 = 0x300;
-
-    if (HAL_FDCAN_ConfigFilter(&hfdcan3, &FDCAN1_sFilterConfig) != HAL_OK) {
-        Error_Handler();
-    }
-    if (HAL_FDCAN_ConfigGlobalFilter(&hfdcan3, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) !=
-        HAL_OK) {
-        Error_Handler();
-    }
-    if (HAL_FDCAN_Start(&hfdcan3) != HAL_OK) {
-        Error_Handler();
-    }
-    if (HAL_FDCAN_ActivateNotification(&hfdcan3, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK){
-        Error_Handler();
-    }
-
-    HAL_TIM_Base_Start_IT(&htim7);
+//    HAL_TIM_Base_Start_IT(&htim7);
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)&adc, 4);
+  uint8_t FDCAN3_TxData[8] = {0};
   while (1)
   {
+//    printf("%d %d %d %d\r\n", adc[0], adc[1], adc[2], adc[3]);
+  	uint16_t current = 500; // 0.1A
+    FDCAN3_TxData[0] = current >> 8;
+    FDCAN3_TxData[1] = current & 0xFF;
+    FDCAN3_TxHeader.Identifier = DJI_CANID_TX1;
+		if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan3, &FDCAN3_TxHeader, FDCAN3_TxData) != HAL_OK) {
+				Error_Handler();
+		}
+		printf("send_message\r\n");
+    HAL_Delay(1);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -460,6 +436,101 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_MultiModeTypeDef multimode = {0};
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Common config
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.GainCompensation = 0;
+  hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc1.Init.LowPowerAutoWait = DISABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.NbrOfConversion = 4;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.DMAContinuousRequests = ENABLE;
+  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc1.Init.OversamplingMode = DISABLE;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure the ADC multi-mode
+  */
+  multimode.Mode = ADC_MODE_INDEPENDENT;
+  if (HAL_ADCEx_MultiModeConfigChannel(&hadc1, &multimode) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_247CYCLES_5;
+  sConfig.SingleDiff = ADC_SINGLE_ENDED;
+  sConfig.OffsetNumber = ADC_OFFSET_NONE;
+  sConfig.Offset = 0;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Rank = ADC_REGULAR_RANK_2;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_6;
+  sConfig.Rank = ADC_REGULAR_RANK_3;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_7;
+  sConfig.Rank = ADC_REGULAR_RANK_4;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
   * @brief FDCAN1 Initialization Function
   * @param None
   * @retval None
@@ -497,6 +568,37 @@ static void MX_FDCAN1_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN FDCAN1_Init 2 */
+
+  FDCAN1_TxHeader.Identifier = 0x000;
+  FDCAN1_TxHeader.IdType = FDCAN_STANDARD_ID;
+  FDCAN1_TxHeader.TxFrameType = FDCAN_DATA_FRAME;
+  FDCAN1_TxHeader.DataLength = FDCAN_DLC_BYTES_1;
+  FDCAN1_TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+  FDCAN1_TxHeader.BitRateSwitch = FDCAN_BRS_ON;
+  FDCAN1_TxHeader.FDFormat = FDCAN_FD_CAN;
+  FDCAN1_TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
+  FDCAN1_TxHeader.MessageMarker = 0;
+
+  FDCAN1_sFilterConfig.IdType = FDCAN_STANDARD_ID;
+  FDCAN1_sFilterConfig.FilterIndex = 0;
+  FDCAN1_sFilterConfig.FilterType = FDCAN_FILTER_MASK;
+  FDCAN1_sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+  FDCAN1_sFilterConfig.FilterID1 = CANID_ARM1;
+  FDCAN1_sFilterConfig.FilterID2 = 0b11111111100;
+
+  if (HAL_FDCAN_ConfigFilter(&hfdcan1, &FDCAN1_sFilterConfig) != HAL_OK) {
+      Error_Handler();
+  }
+  if (HAL_FDCAN_ConfigGlobalFilter(&hfdcan1, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) !=
+      HAL_OK) {
+      Error_Handler();
+  }
+  if (HAL_FDCAN_Start(&hfdcan1) != HAL_OK) {
+      Error_Handler();
+  }
+  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK){
+      Error_Handler();
+  }
 
   /* USER CODE END FDCAN1_Init 2 */
 
@@ -541,6 +643,38 @@ static void MX_FDCAN3_Init(void)
   }
   /* USER CODE BEGIN FDCAN3_Init 2 */
 
+  FDCAN3_TxHeader.Identifier = 0x000;
+  FDCAN3_TxHeader.IdType = FDCAN_STANDARD_ID;
+  FDCAN3_TxHeader.TxFrameType = FDCAN_DATA_FRAME;
+  FDCAN3_TxHeader.DataLength = FDCAN_DLC_BYTES_8;
+  FDCAN3_TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+  FDCAN3_TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
+  FDCAN3_TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
+  FDCAN3_TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
+  FDCAN3_TxHeader.MessageMarker = 0;
+
+  FDCAN3_sFilterConfig.IdType = FDCAN_STANDARD_ID;
+  FDCAN3_sFilterConfig.FilterIndex = 0;
+  FDCAN3_sFilterConfig.FilterType = FDCAN_FILTER_RANGE;
+  FDCAN3_sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO1;
+  FDCAN3_sFilterConfig.FilterID1 = 0x000;
+  FDCAN3_sFilterConfig.FilterID2 = 0x7ff;
+
+	if (HAL_FDCAN_ConfigFilter(&hfdcan3, &FDCAN3_sFilterConfig) != HAL_OK) {
+		Error_Handler();
+	}
+	if (HAL_FDCAN_ConfigGlobalFilter(&hfdcan3, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) != HAL_OK) {
+		Error_Handler();
+	}
+
+	if (HAL_FDCAN_Start(&hfdcan3) != HAL_OK) {
+		Error_Handler();
+	}
+
+	if (HAL_FDCAN_ActivateNotification(&hfdcan3, FDCAN_IT_RX_FIFO1_NEW_MESSAGE, 0) != HAL_OK) {
+		Error_Handler();
+	}
+
   /* USER CODE END FDCAN3_Init 2 */
 
 }
@@ -561,7 +695,7 @@ static void MX_LPUART1_UART_Init(void)
 
   /* USER CODE END LPUART1_Init 1 */
   hlpuart1.Instance = LPUART1;
-  hlpuart1.Init.BaudRate = 1000000;
+  hlpuart1.Init.BaudRate = 115200;
   hlpuart1.Init.WordLength = UART_WORDLENGTH_8B;
   hlpuart1.Init.StopBits = UART_STOPBITS_1;
   hlpuart1.Init.Parity = UART_PARITY_NONE;
@@ -589,6 +723,44 @@ static void MX_LPUART1_UART_Init(void)
   /* USER CODE BEGIN LPUART1_Init 2 */
 
   /* USER CODE END LPUART1_Init 2 */
+
+}
+
+/**
+  * @brief TIM6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM6_Init(void)
+{
+
+  /* USER CODE BEGIN TIM6_Init 0 */
+
+  /* USER CODE END TIM6_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM6_Init 1 */
+
+  /* USER CODE END TIM6_Init 1 */
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 0;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 65535;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM6_Init 2 */
+
+  /* USER CODE END TIM6_Init 2 */
 
 }
 
@@ -627,6 +799,23 @@ static void MX_TIM7_Init(void)
   /* USER CODE BEGIN TIM7_Init 2 */
 
   /* USER CODE END TIM7_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMAMUX1_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
 
 }
 
@@ -682,6 +871,7 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+//	  printf("error\r\n");
   }
   /* USER CODE END Error_Handler_Debug */
 }
