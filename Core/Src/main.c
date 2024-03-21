@@ -26,6 +26,7 @@
 #include "string.h"
 
 #include "R1CANIDList.h"
+#include "DJI_CANIDList.h"
 #include <math.h>
 
 /* USER CODE END Includes */
@@ -56,6 +57,7 @@ FDCAN_HandleTypeDef hfdcan3;
 
 UART_HandleTypeDef hlpuart1;
 
+TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim7;
 
 /* USER CODE BEGIN PV */
@@ -136,6 +138,7 @@ static void MX_FDCAN3_Init(void);
 static void MX_FDCAN1_Init(void);
 static void MX_TIM7_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -215,7 +218,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 
 
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs) {
-//	printf("read message!!!\r\n");
+	printf("read message!!!\r\n");
     if (hfdcan == &hfdcan1){
         if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET) {
             if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &FDCAN1_RxHeader, FDCAN1_RxData) != HAL_OK) {
@@ -261,7 +264,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 
                 static uint8_t times = 0;
                 times++;
-                times%50;
+//                times%50;
                 if(times==0)printf("%d\n\r", adc[0]);
             }
 
@@ -304,6 +307,9 @@ void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
 					printf("error code:%ld\r\n", hfdcan->ErrorCode);
 				Error_Handler();
 			}
+//			printf("can_id is %d\r\n", FDCAN3_RxHeader.Identifier);
+//			uint8_t motorID = FDCAN3_RxHeader.Identifier - DJI_CANID_TX0 - 1;
+			// TODO : Update motor state
 		}
 	}
 }
@@ -344,6 +350,7 @@ int main(void)
   MX_FDCAN1_Init();
   MX_TIM7_Init();
   MX_ADC1_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
   pid.t = 1 / pow(10, 3);
   for (int k = 0; k < 4; k++){
@@ -360,15 +367,20 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
-
-  uint16_t adc1_result[8] = {0};
-
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)&adc1_result, 4);
-
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)&adc, 4);
+  uint8_t FDCAN3_TxData[8] = {0};
   while (1)
   {
-    printf("%d %d %d %d\r\n", adc1_result[0], adc1_result[1], adc1_result[2], adc1_result[3]);
-    HAL_Delay(100);
+//    printf("%d %d %d %d\r\n", adc[0], adc[1], adc[2], adc[3]);
+  	uint16_t current = 500; // 0.1A
+    FDCAN3_TxData[0] = current >> 8;
+    FDCAN3_TxData[1] = current & 0xFF;
+    FDCAN3_TxHeader.Identifier = DJI_CANID_TX1;
+		if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan3, &FDCAN3_TxHeader, FDCAN3_TxData) != HAL_OK) {
+				Error_Handler();
+		}
+		printf("send_message\r\n");
+    HAL_Delay(1);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -711,6 +723,44 @@ static void MX_LPUART1_UART_Init(void)
   /* USER CODE BEGIN LPUART1_Init 2 */
 
   /* USER CODE END LPUART1_Init 2 */
+
+}
+
+/**
+  * @brief TIM6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM6_Init(void)
+{
+
+  /* USER CODE BEGIN TIM6_Init 0 */
+
+  /* USER CODE END TIM6_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM6_Init 1 */
+
+  /* USER CODE END TIM6_Init 1 */
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 0;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 65535;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM6_Init 2 */
+
+  /* USER CODE END TIM6_Init 2 */
 
 }
 
